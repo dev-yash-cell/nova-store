@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard - Inventory Management</title>
+    <title>Admin Dashboard - Advanced Inventory</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-8">
@@ -14,7 +14,7 @@
             <h2 id="form-title" class="text-2xl font-bold mb-6 text-indigo-400">Add New Product</h2>
             
             <form id="product-form" class="space-y-4" onsubmit="handleFormSubmit(event)">
-                <input type="hidden" id="product-id"> <!-- Hidden field for updating -->
+                <input type="hidden" id="product-id">
                 
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-1">Product Name</label>
@@ -24,10 +24,15 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-1">Category</label>
                     <select id="category" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white">
+                        <!-- Expanded Categories -->
                         <option>Electronics</option>
                         <option>Apparel</option>
                         <option>Accessories</option>
                         <option>Footwear</option>
+                        <option>Home & Kitchen</option>
+                        <option>Books</option>
+                        <option>Sports & Outdoors</option>
+                        <option>Beauty</option>
                     </select>
                 </div>
 
@@ -53,9 +58,51 @@
             </form>
         </div>
 
-        <!-- Right Side: Inventory Table -->
+        <!-- Right Side: Inventory & Filters -->
         <div class="w-2/3">
-            <h2 class="text-2xl font-bold mb-6">Current Inventory</h2>
+            <h2 class="text-2xl font-bold mb-4">Current Inventory</h2>
+
+            <!-- FILTER CONTROLS -->
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-6 grid grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Search Name</label>
+                    <input type="text" id="filter-name" oninput="applyFilters()" placeholder="Search..." class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-white">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Filter Category</label>
+                    <select id="filter-category" onchange="applyFilters()" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-white">
+                        <option value="All">All Categories</option>
+                        <option>Electronics</option>
+                        <option>Apparel</option>
+                        <option>Accessories</option>
+                        <option>Footwear</option>
+                        <option>Home & Kitchen</option>
+                        <option>Books</option>
+                        <option>Sports & Outdoors</option>
+                        <option>Beauty</option>
+                    </select>
+                </div>
+                <div class="flex gap-2">
+                    <div class="w-1/2">
+                        <label class="block text-xs text-gray-400 mb-1">Min $</label>
+                        <input type="number" id="filter-min" oninput="applyFilters()" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-white">
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-xs text-gray-400 mb-1">Max $</label>
+                        <input type="number" id="filter-max" oninput="applyFilters()" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Sort by Price</label>
+                    <select id="sort-price" onchange="applyFilters()" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-white">
+                        <option value="default">Default (Newest)</option>
+                        <option value="asc">Price: Low to High</option>
+                        <option value="desc">Price: High to Low</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- INVENTORY TABLE -->
             <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
                 <table class="w-full text-left border-collapse">
                     <thead>
@@ -70,29 +117,69 @@
                         <!-- Items injected here by JS -->
                     </tbody>
                 </table>
+                <div id="no-results" class="hidden text-center p-6 text-gray-400">No products match your filters.</div>
             </div>
         </div>
     </div>
 
     <script>
-        const API_URL = '/api/admin/products';
+        // Update this URL if testing locally without Render (e.g., http://localhost:8080/api/admin/products)
+        const API_URL = '/api/admin/products'; 
         let products = [];
 
-        // 1. READ: Fetch all products on load
+        // 1. Fetch Data
         async function fetchProducts() {
             try {
                 const response = await fetch(API_URL);
                 products = await response.json();
-                renderTable();
+                applyFilters(); // Initial render
             } catch (err) {
-                alert("Failed to connect to backend server.");
+                console.error("Failed to fetch products", err);
             }
         }
 
-        // 2. Render the table
-        function renderTable() {
+        // 2. Filter and Sort Engine
+        function applyFilters() {
+            const searchName = document.getElementById('filter-name').value.toLowerCase();
+            const searchCat = document.getElementById('filter-category').value;
+            const minPrice = parseFloat(document.getElementById('filter-min').value);
+            const maxPrice = parseFloat(document.getElementById('filter-max').value);
+            const sortType = document.getElementById('sort-price').value;
+
+            // Apply Filters
+            let filtered = products.filter(p => {
+                const matchName = p.name.toLowerCase().includes(searchName);
+                const matchCat = searchCat === "All" || p.category === searchCat;
+                const matchMin = isNaN(minPrice) || p.price >= minPrice;
+                const matchMax = isNaN(maxPrice) || p.price <= maxPrice;
+                
+                return matchName && matchCat && matchMin && matchMax;
+            });
+
+            // Apply Sorting
+            if (sortType === "asc") {
+                filtered.sort((a, b) => a.price - b.price);
+            } else if (sortType === "desc") {
+                filtered.sort((a, b) => b.price - a.price);
+            }
+
+            renderTable(filtered);
+        }
+
+        // 3. Render Table
+        function renderTable(dataToRender) {
             const tbody = document.getElementById('inventory-list');
-            tbody.innerHTML = products.map(p => `
+            const noResults = document.getElementById('no-results');
+            
+            if (dataToRender.length === 0) {
+                tbody.innerHTML = "";
+                noResults.classList.remove('hidden');
+                return;
+            } else {
+                noResults.classList.add('hidden');
+            }
+
+            tbody.innerHTML = dataToRender.map(p => `
                 <tr class="border-b border-gray-700 hover:bg-gray-750 transition">
                     <td class="p-4"><img src="${p.imageUrl}" alt="img" class="w-12 h-12 rounded object-cover"></td>
                     <td class="p-4">
@@ -109,10 +196,9 @@
             `).join('');
         }
 
-        // 3. CREATE / UPDATE: Handle form submission
+        // 4. Form Handling (Create / Update)
         async function handleFormSubmit(e) {
             e.preventDefault();
-            
             const id = document.getElementById('product-id').value;
             const productData = {
                 name: document.getElementById('name').value,
@@ -132,10 +218,10 @@
             });
 
             resetForm();
-            fetchProducts(); // Refresh table
+            fetchProducts();
         }
 
-        // 4. Populate form for updating
+        // 5. Populate Form for Edit
         function editProduct(id) {
             const p = products.find(prod => prod.id === id);
             if (!p) return;
@@ -149,22 +235,22 @@
             document.getElementById('description').value = p.description;
         }
 
-        // 5. DELETE: Remove an item
+        // 6. Delete Product
         async function deleteProduct(id) {
             if (confirm("Are you sure you want to delete this product?")) {
                 await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-                fetchProducts(); // Refresh table
+                fetchProducts();
             }
         }
 
-        // Helper: Clear form
+        // Helper: Clear Form
         function resetForm() {
             document.getElementById('form-title').innerText = "Add New Product";
             document.getElementById('product-form').reset();
             document.getElementById('product-id').value = "";
         }
 
-        // Initialize
+        // Boot up
         fetchProducts();
     </script>
 </body>
